@@ -2,7 +2,7 @@
   "name": "exclosured-rust-sigil",
   "displayName": "Exclosured Rust Sigil Highlighting (~RUST)",
   "description": "Syntax highlighting and LSP support for Rust code inside ~RUST sigils in Elixir",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "publisher": "cocoa-xu",
   "repository": {
     "type": "git",
