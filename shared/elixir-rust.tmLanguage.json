@@ -1,0 +1,56 @@
+{
+  "scopeName": "source.elixir.rust",
+  "injectionSelector": "L:source.elixir -comment -text -string",
+  "name": "elixir-rust-sigil",
+  "patterns": [
+    {
+      "comment": "~RUST sigil with heredoc (triple double quotes)",
+      "name": "meta.embedded.block.rust",
+      "begin": "\\s*(~RUST\"\"\")",
+      "beginCaptures": {
+        "1": { "name": "string.quoted.double.heredoc.elixir" }
+      },
+      "end": "^\\s*(\"\"\"[a-z]*)",
+      "endCaptures": {
+        "1": { "name": "string.quoted.double.heredoc.elixir" }
+      },
+      "patterns": [{ "include": "source.rust" }]
+    },
+    {
+      "comment": "~RUST sigil with double quotes",
+      "name": "meta.embedded.block.rust",
+      "begin": "~RUST\\\"",
+      "beginCaptures": { "0": { "name": "string.quoted.double.elixir" } },
+      "end": "\\\"[a-z]*",
+      "endCaptures": { "0": { "name": "string.quoted.double.elixir" } },
+      "patterns": [{ "include": "source.rust" }]
+    },
+    {
+      "comment": "~RUST sigil with square brackets",
+      "name": "meta.embedded.block.rust",
+      "begin": "~RUST\\[",
+      "beginCaptures": { "0": { "name": "string.quoted.other.elixir" } },
+      "end": "\\][a-z]*",
+      "endCaptures": { "0": { "name": "string.quoted.other.elixir" } },
+      "patterns": [{ "include": "source.rust" }]
+    },
+    {
+      "comment": "~RUST sigil with parentheses",
+      "name": "meta.embedded.block.rust",
+      "begin": "~RUST\\(",
+      "beginCaptures": { "0": { "name": "string.quoted.other.elixir" } },
+      "end": "\\)[a-z]*",
+      "endCaptures": { "0": { "name": "string.quoted.other.elixir" } },
+      "patterns": [{ "include": "source.rust" }]
+    },
+    {
+      "comment": "~RUST sigil with curly brackets",
+      "name": "meta.embedded.block.rust",
+      "begin": "~RUST\\{",
+      "beginCaptures": { "0": { "name": "string.quoted.other.elixir" } },
+      "end": "\\}[a-z]*",
+      "endCaptures": { "0": { "name": "string.quoted.other.elixir" } },
+      "patterns": [{ "include": "source.rust" }]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "name": "exclosured-rust-sigil",
+  "displayName": "Exclosured Rust Sigil Highlighting (~RUST)",
+  "description": "Syntax highlighting and LSP support for Rust code inside ~RUST sigils in Elixir",
+  "version": "0.2.0",
+  "publisher": "cocoa-xu",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cocoa-xu/exclosured_sigil_highlighting",
+    "directory": "vscode"
+  },
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:elixir"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "elixir",
+    "rust",
+    "wasm",
+    "sigil",
+    "exclosured",
+    "~RUST"
+  ],
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "prepackage": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.60.0",
+    "typescript": "^5.0.0"
+  },
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "source.elixir.rust",
+        "path": "./syntaxes/elixir-rust.json",
+        "injectTo": [
+          "source.elixir"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.rust": "rust"
+        }
+      }
+    ]
+  }
+}

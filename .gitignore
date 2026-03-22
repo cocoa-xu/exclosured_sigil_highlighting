@@ -1,0 +1,5 @@
+node_modules/
+vscode/out/
+.exclosured/
+*.vsix
+plan.md
