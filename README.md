@@ -82,4 +82,4 @@ See [developer.md](developer.md) for build, test, and local development instruct
 
 ## License
 
-Apache-2.0
+MIT
