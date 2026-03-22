@@ -45,7 +45,7 @@ const ELIXIR_TO_RUST_TYPES: Record<string, string> = {
     'f64': 'f64',
 };
 
-function mapElixirTypeToRust(elixirType: string): string {
+export function mapElixirTypeToRust(elixirType: string): string {
     return ELIXIR_TO_RUST_TYPES[elixirType] || 'i32';
 }
 
@@ -128,7 +128,7 @@ function parseHeredocSigil(
     return null;
 }
 
-function calculateBaseIndent(lines: string[]): number {
+export function calculateBaseIndent(lines: string[]): number {
     let min = Infinity;
     for (const line of lines) {
         if (line.trim().length === 0) { continue; }
@@ -166,7 +166,7 @@ function parseDefwasmContext(
     return undefined;
 }
 
-function parseArgs(decl: string): DefwasmArg[] {
+export function parseArgs(decl: string): DefwasmArg[] {
     const args: DefwasmArg[] = [];
     const m = decl.match(/args:\s*\[(.*?)\]/s);
     if (!m) { return args; }
@@ -187,7 +187,7 @@ function parseArgs(decl: string): DefwasmArg[] {
     return args;
 }
 
-function parseReturnType(decl: string): string {
+export function parseReturnType(decl: string): string {
     const m = decl.match(/return_type:\s*:(\w+)/);
     return m ? mapElixirTypeToRust(m[1]) : 'i32';
 }
@@ -198,7 +198,7 @@ function parseReturnType(decl: string): string {
  *   deps: ["pulldown-cmark": "0.12"]                      — string key
  *   deps: [{"serde", "1", features: ["derive"]}]          — tuple ± features
  */
-function parseDeps(decl: string): CrateDep[] {
+export function parseDeps(decl: string): CrateDep[] {
     const deps: CrateDep[] = [];
 
     // Extract the deps: [...] content.  Use a manual bracket-matcher

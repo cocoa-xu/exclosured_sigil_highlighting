@@ -4,21 +4,21 @@ import { CargoProjectManager, PREAMBLE_LINES } from './cargoProject';
 
 // ── Position mapping ────────────────────────────────────────────────
 
-function elixirToVirtual(region: SigilRegion, pos: vscode.Position): vscode.Position {
+export function elixirToVirtual(region: SigilRegion, pos: vscode.Position): vscode.Position {
     return new vscode.Position(
         pos.line - region.contentRange.start.line + PREAMBLE_LINES,
         Math.max(0, pos.character - region.baseIndent),
     );
 }
 
-function virtualToElixir(region: SigilRegion, pos: vscode.Position): vscode.Position {
+export function virtualToElixir(region: SigilRegion, pos: vscode.Position): vscode.Position {
     return new vscode.Position(
         pos.line - PREAMBLE_LINES + region.contentRange.start.line,
         pos.character + region.baseIndent,
     );
 }
 
-function virtualRangeToElixir(region: SigilRegion, range: vscode.Range): vscode.Range {
+export function virtualRangeToElixir(region: SigilRegion, range: vscode.Range): vscode.Range {
     return new vscode.Range(
         virtualToElixir(region, range.start),
         virtualToElixir(region, range.end),

@@ -15,114 +15,114 @@ export interface SigilMapping {
     contentLineCount: number;
 }
 
+interface PendingWrite {
+    rsPath: string;
+    rsContent: string;
+    cargoPath: string;
+    cargoContent: string;
+}
+
 export class CargoProjectManager implements vscode.Disposable {
     private projectPath = '';
-    private srcDir = '';
-    private knownModules = new Set<string>();
-    private allDeps = new Map<string, CrateDep>(); // name -> dep
-    private fileMap = new Map<string, SigilMapping>(); // generatedPath -> mapping
+    private fileMap = new Map<string, SigilMapping>();
     private writeTimer: ReturnType<typeof setTimeout> | undefined;
-    private pendingWrites = new Map<string, string>();
+    private pendingWrites = new Map<string, PendingWrite>();
 
-    /** Create the hidden Cargo project. Returns false if no workspace is open. */
+    /** Create the workspace-level Cargo.toml. Returns false if no workspace. */
     async initialize(): Promise<boolean> {
         const folders = vscode.workspace.workspaceFolders;
         if (!folders || folders.length === 0) { return false; }
 
         this.projectPath = path.join(folders[0].uri.fsPath, PROJECT_DIR);
-        this.srcDir = path.join(this.projectPath, 'src');
+        await fs.promises.mkdir(this.projectPath, { recursive: true });
 
-        await fs.promises.mkdir(this.srcDir, { recursive: true });
+        // Workspace manifest — each sigil becomes an independent member
+        await fs.promises.writeFile(
+            path.join(this.projectPath, 'Cargo.toml'),
+            [
+                '[workspace]',
+                'members = ["sigil_*"]',
+                'resolver = "2"',
+                '',
+            ].join('\n'),
+        );
 
-        // Cargo.toml (always rewrite so deps are fresh)
-        this.writeCargoTomlSync();
-
-        // .gitignore inside .exclosured so git ignores all generated files
+        // Keep generated files out of git
         await fs.promises.writeFile(
             path.join(this.projectPath, '.gitignore'),
             '*\n',
         );
 
-        await this.writeLibRs();
         return true;
     }
 
-    /** Debounced: extract all sigils from a document and queue .rs file writes. */
+    /** Debounced: extract all sigils from a document and queue writes. */
     syncDocument(document: vscode.TextDocument): void {
         if (!this.projectPath) { return; }
 
         const regions = findSigilRegions(document);
         for (const region of regions) {
-            const mod = this.moduleName(document.uri, region);
-            const file = path.join(this.srcDir, `${mod}.rs`);
-            this.pendingWrites.set(file, generateRustFile(region));
-            this.knownModules.add(mod);
-            this.collectDeps(region);
-            this.fileMap.set(file, {
-                sourceUri: document.uri,
-                contentStartLine: region.contentRange.start.line,
-                baseIndent: region.baseIndent,
-                contentLineCount: region.dedentedContent.split('\n').length,
-            });
+            this.queueWrite(document.uri, region);
         }
         this.scheduleFlush();
     }
 
-    /** Write the .rs file immediately (for use right before an LSP request). */
+    /** Immediate: ensure this sigil's member crate exists, return its lib.rs URI. */
     ensureFile(region: SigilRegion, sourceUri: vscode.Uri): vscode.Uri {
-        const mod = this.moduleName(sourceUri, region);
-        const file = path.join(this.srcDir, `${mod}.rs`);
+        const member = this.memberName(sourceUri, region);
+        const memberDir = path.join(this.projectPath, member);
+        const srcDir = path.join(memberDir, 'src');
+        const rsFile = path.join(srcDir, 'lib.rs');
 
-        fs.writeFileSync(file, generateRustFile(region));
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.writeFileSync(rsFile, generateRustFile(region));
+        fs.writeFileSync(
+            path.join(memberDir, 'Cargo.toml'),
+            generateMemberCargoToml(member, region),
+        );
 
-        this.fileMap.set(file, {
-            sourceUri: sourceUri,
+        this.fileMap.set(rsFile, {
+            sourceUri,
             contentStartLine: region.contentRange.start.line,
             baseIndent: region.baseIndent,
             contentLineCount: region.dedentedContent.split('\n').length,
         });
 
-        let changed = false;
-        if (!this.knownModules.has(mod)) {
-            this.knownModules.add(mod);
-            changed = true;
-        }
-        if (this.collectDeps(region) || changed) {
-            this.writeLibRsSync();
-            this.writeCargoTomlSync();
-        }
-
-        return vscode.Uri.file(file);
+        return vscode.Uri.file(rsFile);
     }
 
-    /** Merge region deps into allDeps. Returns true if anything changed. */
-    private collectDeps(region: SigilRegion): boolean {
-        const deps = region.context?.deps;
-        if (!deps || deps.length === 0) { return false; }
-
-        let changed = false;
-        for (const dep of deps) {
-            const existing = this.allDeps.get(dep.name);
-            if (!existing || existing.version !== dep.version
-                || JSON.stringify(existing.features) !== JSON.stringify(dep.features)) {
-                this.allDeps.set(dep.name, dep);
-                changed = true;
-            }
-        }
-        return changed;
-    }
-
-    /** Look up the source mapping for a generated .rs file path. */
+    /** Look up the source mapping for a generated lib.rs path. */
     getMapping(generatedPath: string): SigilMapping | undefined {
         return this.fileMap.get(generatedPath);
     }
 
     // ── internals ──────────────────────────────────────────
 
-    private moduleName(sourceUri: vscode.Uri, region: SigilRegion): string {
+    private memberName(sourceUri: vscode.Uri, region: SigilRegion): string {
         const rel = vscode.workspace.asRelativePath(sourceUri);
         const safe = rel.replace(/[^a-zA-Z0-9]/g, '_');
         return `sigil_${safe}_l${region.contentRange.start.line}`;
+    }
+
+    private queueWrite(sourceUri: vscode.Uri, region: SigilRegion): void {
+        const member = this.memberName(sourceUri, region);
+        const memberDir = path.join(this.projectPath, member);
+        const srcDir = path.join(memberDir, 'src');
+        const rsFile = path.join(srcDir, 'lib.rs');
+
+        this.pendingWrites.set(rsFile, {
+            rsPath: rsFile,
+            rsContent: generateRustFile(region),
+            cargoPath: path.join(memberDir, 'Cargo.toml'),
+            cargoContent: generateMemberCargoToml(member, region),
+        });
+
+        this.fileMap.set(rsFile, {
+            sourceUri,
+            contentStartLine: region.contentRange.start.line,
+            baseIndent: region.baseIndent,
+            contentLineCount: region.dedentedContent.split('\n').length,
+        });
     }
 
     private scheduleFlush(): void {
@@ -131,57 +131,12 @@ export class CargoProjectManager implements vscode.Disposable {
     }
 
     private flush(): void {
-        for (const [file, content] of this.pendingWrites) {
-            fs.writeFileSync(file, content);
+        for (const pw of this.pendingWrites.values()) {
+            fs.mkdirSync(path.dirname(pw.rsPath), { recursive: true });
+            fs.writeFileSync(pw.rsPath, pw.rsContent);
+            fs.writeFileSync(pw.cargoPath, pw.cargoContent);
         }
         this.pendingWrites.clear();
-        this.writeLibRsSync();
-        this.writeCargoTomlSync();
-    }
-
-    private writeCargoTomlSync(): void {
-        const lines = [
-            '[package]',
-            'name = "exclosured-virtual"',
-            'version = "0.0.0"',
-            'edition = "2021"',
-            'publish = false',
-            '',
-        ];
-
-        if (this.allDeps.size > 0) {
-            lines.push('[dependencies]');
-            for (const dep of this.allDeps.values()) {
-                if (dep.features && dep.features.length > 0) {
-                    const feats = dep.features.map(f => `"${f}"`).join(', ');
-                    lines.push(`${dep.name} = { version = "${dep.version}", features = [${feats}] }`);
-                } else {
-                    lines.push(`${dep.name} = "${dep.version}"`);
-                }
-            }
-            lines.push('');
-        }
-
-        fs.writeFileSync(
-            path.join(this.projectPath, 'Cargo.toml'),
-            lines.join('\n'),
-        );
-    }
-
-    private writeLibRsSync(): void {
-        const mods = [...this.knownModules].map(m => `mod ${m};`).join('\n');
-        fs.writeFileSync(
-            path.join(this.srcDir, 'lib.rs'),
-            `// Auto-generated by exclosured-rust-sigil\n${mods}\n`,
-        );
-    }
-
-    private async writeLibRs(): Promise<void> {
-        const mods = [...this.knownModules].map(m => `mod ${m};`).join('\n');
-        await fs.promises.writeFile(
-            path.join(this.srcDir, 'lib.rs'),
-            `// Auto-generated by exclosured-rust-sigil\n${mods}\n`,
-        );
     }
 
     dispose(): void {
@@ -190,7 +145,36 @@ export class CargoProjectManager implements vscode.Disposable {
     }
 }
 
-function generateRustFile(region: SigilRegion): string {
+// ── Code generation ─────────────────────────────────────────────────
+
+export function generateMemberCargoToml(memberName: string, region: SigilRegion): string {
+    const lines = [
+        '[package]',
+        `name = "${memberName}"`,
+        'version = "0.0.0"',
+        'edition = "2021"',
+        'publish = false',
+        '',
+    ];
+
+    const deps = region.context?.deps;
+    if (deps && deps.length > 0) {
+        lines.push('[dependencies]');
+        for (const dep of deps) {
+            if (dep.features && dep.features.length > 0) {
+                const feats = dep.features.map(f => `"${f}"`).join(', ');
+                lines.push(`${dep.name} = { version = "${dep.version}", features = [${feats}] }`);
+            } else {
+                lines.push(`${dep.name} = "${dep.version}"`);
+            }
+        }
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+export function generateRustFile(region: SigilRegion): string {
     const ctx = region.context;
     const lines: string[] = [];
 

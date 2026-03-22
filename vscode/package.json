@@ -30,13 +30,16 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepackage": "npm run compile",
     "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/vscode": "^1.60.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.0"
   },
   "contributes": {
     "grammars": [
